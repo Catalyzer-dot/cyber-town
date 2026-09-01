@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="赛博小镇 AI NPC Web 调试台" />
+    <title>赛博小镇 · NPC 调试台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">CYBER TOWN</p>
+          <h1>NPC 调试台</h1>
+          <p class="subtitle">先验证接口与交互，再接入 LangGraph 和 Godot。</p>
+        </div>
+
+        <section>
+          <h2>选择角色</h2>
+          <div id="npc-list" class="npc-list" aria-live="polite"></div>
+        </section>
+
+        <div class="status-card">
+          <span id="health-dot" class="status-dot"></span>
+          <div>
+            <strong id="health-label">正在连接</strong>
+            <p>API · 模拟响应模式</p>
+          </div>
+        </div>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">CURRENT CHARACTER</p>
+            <h2 id="current-npc">加载中…</h2>
+            <p id="current-role"></p>
+          </div>
+          <div class="relationship">
+            <span>关系</span>
+            <strong id="relationship-level">陌生 · 0</strong>
+          </div>
+        </header>
+
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="empty-state">
+            <span>◌</span>
+            <p>选择一位 NPC，发出赛博小镇的第一条消息。</p>
+          </div>
+        </div>
+
+        <form id="dialogue-form" class="composer">
+          <label for="message">发送给 NPC</label>
+          <div class="composer-row">
+            <textarea
+              id="message"
+              name="message"
+              rows="2"
+              maxlength="2000"
+              placeholder="例如：你还记得我们上次讨论的项目吗？"
+              required
+            ></textarea>
+            <button type="submit">发送</button>
+          </div>
+          <p id="form-status" class="form-status">Enter 发送 · Shift + Enter 换行</p>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+name: cyber-town
+
+services:
+  app:
+    image: ${CYBER_TOWN_IMAGE:-ccr.ccs.tencentyun.com/degenerates/cyber-town:latest}
+    container_name: cyber-town-app
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    cpus: 0.75
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    networks:
+      - proxy
+      - internal
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-cyber-town-proxy}
+  internal:
+    name: cyber-town-internal
+    internal: true

@@ -1,0 +1,114 @@
+name: Build and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ccr.ccs.tencentyun.com
+  IMAGE_NAME: degenerates/cyber-town
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify TypeScript application
+        run: |
+          npm ci
+          npm run check
+          npm test
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Tencent Cloud TCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=pr
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Copy deployment files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: compose.prod.yaml,.env.example,deploy.sh,deploy/nginx-town.conf,deploy/NGINX_INTEGRATION.md
+          target: /tmp/cyber-town-config/
+          timeout: 5m
+          command_timeout: 5m
+
+      - name: Deploy application container
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@master
+        env:
+          CYBER_TOWN_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          TCR_REGISTRY: ${{ env.REGISTRY }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: CYBER_TOWN_IMAGE,TCR_REGISTRY,TCR_USERNAME,TCR_PASSWORD
+          timeout: 15m
+          command_timeout: 15m
+          script: |
+            set -e
+            mkdir -p /opt/cyber-town/deploy
+            cp /tmp/cyber-town-config/compose.prod.yaml /opt/cyber-town/
+            cp /tmp/cyber-town-config/deploy.sh /opt/cyber-town/
+            cp /tmp/cyber-town-config/deploy/nginx-town.conf /opt/cyber-town/deploy/
+            cp /tmp/cyber-town-config/deploy/NGINX_INTEGRATION.md /opt/cyber-town/deploy/
+            if [ ! -f /opt/cyber-town/.env ]; then
+              cp /tmp/cyber-town-config/.env.example /opt/cyber-town/.env
+            fi
+            chmod +x /opt/cyber-town/deploy.sh
+            rm -rf /tmp/cyber-town-config
+            cd /opt/cyber-town
+            ./deploy.sh
