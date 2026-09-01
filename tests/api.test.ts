@@ -35,8 +35,13 @@ test('可以与已存在的 NPC 对话', async () => {
   });
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.json().meta.mode, 'mock');
+  assert.equal(response.json().meta.mode, 'langgraph-mock');
   assert.equal(response.json().npcId, 'zhang-san');
+  assert.deepEqual(response.json().meta.graphSteps, [
+    'load-npc',
+    'generate-reply',
+    'update-relationship',
+  ]);
 });
 
 test('拒绝空消息', async () => {

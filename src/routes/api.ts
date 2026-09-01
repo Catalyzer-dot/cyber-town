@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 
+import { runNpcDialogueGraph } from '../agents/npc/npc-dialogue-graph.ts';
 import { dialogueRequestSchema } from '../contracts.ts';
-import { createMockDialogue, listNpcs } from '../domain/npc-service.ts';
+import { listNpcs } from '../domain/npc-service.ts';
 
 export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
   app.get('/health', async () => ({
@@ -25,7 +26,7 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const result = createMockDialogue(parsed.data, request.id);
+    const result = await runNpcDialogueGraph(parsed.data, request.id);
 
     if (!result) {
       return reply.code(404).send({

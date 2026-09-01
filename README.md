@@ -1,6 +1,8 @@
 # Cyber Town
 
-赛博小镇的 TypeScript 后端与 Web 调试台。当前第一阶段使用固定 NPC 回复，先验证浏览器、API、Docker 和镜像构建链路；后续接入 LangGraph、LLM、PostgreSQL 和长期记忆。
+赛博小镇的 TypeScript 后端与 Web 调试台。当前通过 LangGraph 的确定性模拟节点验证浏览器、API、状态图、Docker 和镜像构建链路；后续接入真实 LLM、PostgreSQL 和长期记忆。
+
+LangGraph 第一阶段已经接入，当前使用三个可测试节点执行模拟回复。配套讲解和 SVG 流程图见 [`docs/langgraph-practice-01.md`](./docs/langgraph-practice-01.md)。
 
 ## 本地运行
 

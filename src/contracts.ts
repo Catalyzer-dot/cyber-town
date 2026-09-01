@@ -27,7 +27,8 @@ export interface DialogueResponse {
     level: RelationshipLevel;
   };
   meta: {
-    mode: 'mock';
+    mode: 'langgraph-mock';
     requestId: string;
+    graphSteps: string[];
   };
 }

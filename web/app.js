@@ -119,7 +119,7 @@ async function sendMessage() {
 
     appendMessage(data.reply, 'npc');
     relationshipLevel.textContent = `${translateLevel(data.relationship.level)} · ${data.relationship.affinity}`;
-    showStatus(`模拟模式 · 请求 ${data.meta.requestId}`);
+    showStatus(`LangGraph · ${data.meta.graphSteps.join(' → ')}`);
   } catch (error) {
     appendMessage('连接失败，请确认 API 服务是否正常。', 'npc');
     showStatus(error instanceof Error ? error.message : '发送失败。', true);
