@@ -7,13 +7,13 @@ services:
     restart: unless-stopped
     env_file:
       - path: .env
-        required: false
+        required: true
     environment:
       HOST: 0.0.0.0
       PORT: 3000
       LOG_LEVEL: ${LOG_LEVEL:-info}
     expose:
-      - "3000"
+      - '3000'
     healthcheck:
       test:
         - CMD
@@ -37,7 +37,7 @@ services:
       driver: json-file
       options:
         max-size: 10m
-        max-file: "3"
+        max-file: '3'
     networks:
       - proxy
       - internal

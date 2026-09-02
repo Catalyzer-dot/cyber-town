@@ -147,13 +147,15 @@ function showStatus(text, isError = false) {
 }
 
 function translateLevel(level) {
-  return {
-    stranger: '陌生',
-    familiar: '熟悉',
-    friendly: '友好',
-    intimate: '亲密',
-    'best-friend': '挚友',
-  }[level] ?? level;
+  return (
+    {
+      stranger: '陌生',
+      familiar: '熟悉',
+      friendly: '友好',
+      intimate: '亲密',
+      'best-friend': '挚友',
+    }[level] ?? level
+  );
 }
 
 function getOrCreateId(storageKey, prefix) {
