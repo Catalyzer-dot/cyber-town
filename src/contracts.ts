@@ -7,14 +7,41 @@ export const dialogueRequestSchema = z.object({
   message: z.string().trim().min(1).max(2_000),
 });
 
-export type DialogueRequest = z.infer<typeof dialogueRequestSchema>;
+export const dialogueHistoryParamsSchema = dialogueRequestSchema.pick({
+  conversationId: true,
+});
 
-export type RelationshipLevel =
-  | 'stranger'
-  | 'familiar'
-  | 'friendly'
-  | 'intimate'
-  | 'best-friend';
+export const dialogueHistoryQuerySchema = dialogueRequestSchema.pick({
+  playerId: true,
+  npcId: true,
+});
+
+export const relationshipLevelSchema = z.enum([
+  'stranger',
+  'familiar',
+  'friendly',
+  'intimate',
+  'best-friend',
+]);
+
+export type RelationshipLevel = z.infer<typeof relationshipLevelSchema>;
+
+export interface DialogueHistoryResponse {
+  conversationId: string;
+  npcId: string;
+  messages: Array<{
+    role: 'player' | 'npc';
+    content: string;
+  }>;
+  emotion: 'positive' | 'neutral' | 'negative';
+  relationship: {
+    affinity: number;
+    delta: number;
+    level: RelationshipLevel;
+  };
+}
+
+export type DialogueRequest = z.infer<typeof dialogueRequestSchema>;
 
 export interface DialogueResponse {
   conversationId: string;
@@ -27,8 +54,7 @@ export interface DialogueResponse {
     level: RelationshipLevel;
   };
   meta: {
-    mode: 'langgraph-mock';
+    mode: 'deepseek';
     requestId: string;
-    graphSteps: string[];
   };
 }

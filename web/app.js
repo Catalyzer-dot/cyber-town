@@ -119,7 +119,7 @@ async function sendMessage() {
 
     appendMessage(data.reply, 'npc');
     relationshipLevel.textContent = `${translateLevel(data.relationship.level)} · ${data.relationship.affinity}`;
-    showStatus(`LangGraph · ${data.meta.graphSteps.join(' → ')}`);
+    showStatus(`模拟模式 · 请求 ${data.meta.requestId}`);
   } catch (error) {
     appendMessage('连接失败，请确认 API 服务是否正常。', 'npc');
     showStatus(error instanceof Error ? error.message : '发送失败。', true);
@@ -147,13 +147,15 @@ function showStatus(text, isError = false) {
 }
 
 function translateLevel(level) {
-  return {
-    stranger: '陌生',
-    familiar: '熟悉',
-    friendly: '友好',
-    intimate: '亲密',
-    'best-friend': '挚友',
-  }[level] ?? level;
+  return (
+    {
+      stranger: '陌生',
+      familiar: '熟悉',
+      friendly: '友好',
+      intimate: '亲密',
+      'best-friend': '挚友',
+    }[level] ?? level
+  );
 }
 
 function getOrCreateId(storageKey, prefix) {

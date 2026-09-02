@@ -5,10 +5,14 @@
   "description": "A TypeScript and LangGraph-ready AI NPC town backend with a web simulator.",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "dev": "node --env-file=.env --watch --experimental-strip-types src/server.ts",
     "start": "node --experimental-strip-types src/server.ts",
     "check": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types tests/*.test.ts"
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "test:postgres": "node --env-file=.env --test --experimental-strip-types tests/integration/postgres-persistence.test.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "deepseek:smoke": "node --env-file=.env --experimental-strip-types src/scripts/deepseek-smoke.ts"
   },
   "engines": {
     "node": ">=22.6.0"
@@ -16,12 +20,15 @@
   "dependencies": {
     "@fastify/static": "^10.1.3",
     "@langchain/core": "^1.2.9",
+    "@langchain/deepseek": "^1.1.11",
     "@langchain/langgraph": "^1.4.13",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.5",
     "fastify": "^5.12.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "prettier": "^3.9.6",
     "typescript": "^7.0.2"
   }
 }

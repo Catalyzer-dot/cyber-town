@@ -1,128 +1,65 @@
 import {
   END,
-  ReducedValue,
   START,
   StateGraph,
-  StateSchema,
+  type BaseCheckpointSaver,
+  type BaseStore,
 } from '@langchain/langgraph';
-import type {
-  ConditionalEdgeRouter,
-  GraphNode,
-} from '@langchain/langgraph';
-import * as z from 'zod';
-
+import { GENERATE_REPLY_RETRY_POLICY } from './npc-dialogue-config.ts';
+import { GENERATE_REPLY_NODE, createGenerateReplyNode } from './nodes/generate-reply.ts';
+import { LOAD_NPC_NODE, loadNpc } from './nodes/load-npc.ts';
+import { npcDialogueStateSchema, type NpcDialogueState } from './npc-dialogue-state.ts';
+import { UPDATE_RELATIONSHIP_NODE, updateRelationship } from './nodes/update-relationship.ts';
+import { memorySaver } from './infrastructure/memory-saver.ts';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { TRIM_MESSAGES_NODE, trimMessages } from './nodes/trim-messages.ts';
 import {
-  dialogueRequestSchema,
-  type DialogueRequest,
-  type DialogueResponse,
-} from '../../contracts.ts';
+  LOAD_RELATIONSHIP_MEMORY_NODE,
+  loadRelationshipMemory,
+} from './nodes/load-relationship-memory.ts';
 import {
-  createMockReply,
-  findNpc,
-} from '../../domain/npc-service.ts';
+  SAVE_RELATIONSHIP_MEMORY_NODE,
+  saveRelationshipMemory,
+} from './nodes/save-relationship-memory.ts';
 
-const npcProfileSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  role: z.string(),
-  personality: z.string(),
-  accentColor: z.string(),
-});
-
-export const NpcDialogueState = new StateSchema({
-  input: dialogueRequestSchema,
-  requestId: z.string(),
-  npcFound: z.boolean().default(false),
-  npc: npcProfileSchema.optional(),
-  reply: z.string().default(''),
-  emotion: z.enum(['positive', 'neutral', 'negative']).default('neutral'),
-  affinity: z.number().default(0),
-  affinityDelta: z.number().default(0),
-  relationshipLevel: z
-    .enum(['stranger', 'familiar', 'friendly', 'intimate', 'best-friend'])
-    .default('stranger'),
-  graphSteps: new ReducedValue(
-    z.array(z.string()).default(() => []),
-    { reducer: (current, update) => current.concat(update) },
-  ),
-});
-
-const loadNpc: GraphNode<typeof NpcDialogueState> = (state) => {
-  const npc = findNpc(state.input.npcId);
-
-  if (!npc) {
-    return {
-      npcFound: false,
-      graphSteps: ['load-npc:not-found'],
-    };
-  }
-
-  return {
-    npc,
-    npcFound: true,
-    graphSteps: ['load-npc'],
-  };
+export type CreateNpcDialogueGraphOptions = {
+  checkpointer?: BaseCheckpointSaver;
+  store: BaseStore;
 };
 
-const routeAfterNpcLoad: ConditionalEdgeRouter<
-  typeof NpcDialogueState,
-  Record<string, unknown>,
-  'generateReply'
-> = (state) => (state.npcFound ? 'generateReply' : END);
-
-const generateReply: GraphNode<typeof NpcDialogueState> = (state) => {
-  if (!state.npc) {
-    throw new Error('generateReply 节点缺少 NPC 上下文。');
-  }
-
-  return {
-    reply: createMockReply(state.input, state.npc),
-    graphSteps: ['generate-reply'],
-  };
+const routeAfterLoadNpc = (
+  state: NpcDialogueState,
+): typeof LOAD_RELATIONSHIP_MEMORY_NODE | typeof END => {
+  return state.npcFound ? LOAD_RELATIONSHIP_MEMORY_NODE : END;
 };
 
-const updateRelationship: GraphNode<typeof NpcDialogueState> = () => ({
-  emotion: 'neutral',
-  affinity: 0,
-  affinityDelta: 0,
-  relationshipLevel: 'stranger',
-  graphSteps: ['update-relationship'],
-});
+export const createNpcDialogueGraph = (
+  model: BaseChatModel,
+  options: CreateNpcDialogueGraphOptions,
+) => {
+  const generateReplyNode = createGenerateReplyNode(model);
+  const checkpointer = options.checkpointer ?? memorySaver;
 
-export const npcDialogueGraph = new StateGraph(NpcDialogueState)
-  .addNode('loadNpc', loadNpc)
-  .addNode('generateReply', generateReply)
-  .addNode('updateRelationship', updateRelationship)
-  .addEdge(START, 'loadNpc')
-  .addConditionalEdges('loadNpc', routeAfterNpcLoad, ['generateReply', END])
-  .addEdge('generateReply', 'updateRelationship')
-  .addEdge('updateRelationship', END)
-  .compile();
+  return new StateGraph(npcDialogueStateSchema)
+    .addNode(LOAD_NPC_NODE, loadNpc)
+    .addNode(GENERATE_REPLY_NODE, generateReplyNode, {
+      retryPolicy: GENERATE_REPLY_RETRY_POLICY,
+    })
+    .addNode(UPDATE_RELATIONSHIP_NODE, updateRelationship)
+    .addNode(TRIM_MESSAGES_NODE, trimMessages)
+    .addNode(LOAD_RELATIONSHIP_MEMORY_NODE, loadRelationshipMemory)
+    .addNode(SAVE_RELATIONSHIP_MEMORY_NODE, saveRelationshipMemory)
+    .addEdge(START, LOAD_NPC_NODE)
+    .addConditionalEdges(LOAD_NPC_NODE, routeAfterLoadNpc, [LOAD_RELATIONSHIP_MEMORY_NODE, END])
+    .addEdge(LOAD_RELATIONSHIP_MEMORY_NODE, GENERATE_REPLY_NODE)
+    .addEdge(GENERATE_REPLY_NODE, UPDATE_RELATIONSHIP_NODE)
+    .addEdge(UPDATE_RELATIONSHIP_NODE, SAVE_RELATIONSHIP_MEMORY_NODE)
+    .addEdge(SAVE_RELATIONSHIP_MEMORY_NODE, TRIM_MESSAGES_NODE)
+    .addEdge(TRIM_MESSAGES_NODE, END)
+    .compile({
+      checkpointer,
+      store: options.store,
+    });
+};
 
-export async function runNpcDialogueGraph(
-  input: DialogueRequest,
-  requestId: string,
-): Promise<DialogueResponse | null> {
-  const result = await npcDialogueGraph.invoke({ input, requestId });
-
-  if (!result.npcFound || !result.npc) {
-    return null;
-  }
-
-  return {
-    conversationId: input.conversationId,
-    npcId: result.npc.id,
-    reply: result.reply,
-    emotion: result.emotion,
-    relationship: {
-      affinity: result.affinity,
-      delta: result.affinityDelta,
-      level: result.relationshipLevel,
-    },
-    meta: {
-      mode: 'langgraph-mock',
-      requestId,
-      graphSteps: result.graphSteps,
-    },
-  };
-}
+export type NpcDialogueGraph = ReturnType<typeof createNpcDialogueGraph>;
